@@ -1,5 +1,11 @@
-const AWS = require("aws-sdk");
-const ddb = new AWS.DynamoDB.DocumentClient();
+const AWS = require("aws-sdk"),
+      {
+        DynamoDBDocument
+      } = require("@aws-sdk/lib-dynamodb"),
+      {
+        DynamoDB
+      } = require("@aws-sdk/client-dynamodb");
+const ddb = DynamoDBDocument.from(new DynamoDB());
 
 AWS.config.update({ region: process.env.REGION });
 
@@ -22,7 +28,7 @@ async function setDynamoTimestampNow(jobId, attribute) {
     ReturnValues: "UPDATED_NEW"
   };
 
-  return ddb.update(params).promise();
+  return ddb.update(params);
 }
 
 exports.handler = async function(event, context) {

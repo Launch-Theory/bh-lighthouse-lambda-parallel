@@ -1,25 +1,26 @@
-const AWS = require("aws-sdk");
+const AWS = require("aws-sdk"),
+  { DynamoDBDocument } = require("@aws-sdk/lib-dynamodb"),
+  { DynamoDB } = require("@aws-sdk/client-dynamodb"),
+  { SNS } = require("@aws-sdk/client-sns");
 const uuidv1 = require("uuid/v1");
 const assert = require("assert");
 
 AWS.config.update({ region: process.env.REGION });
 
-const sns = new AWS.SNS();
-const ddb = new AWS.DynamoDB.DocumentClient();
+const sns = new SNS();
+const ddb = DynamoDBDocument.from(new DynamoDB());
 
 async function createJobItemDynamo(jobId, startTime, totalPages) {
-  return ddb
-    .put({
-      TableName: process.env.TABLE_NAME,
-      Item: {
-        JobId: jobId,
-        StartTime: startTime,
-        PageCountTotal: totalPages,
-        PageCountSuccess: 0,
-        PageCountError: 0
-      }
-    })
-    .promise();
+  return ddb.put({
+    TableName: process.env.TABLE_NAME,
+    Item: {
+      JobId: jobId,
+      StartTime: startTime,
+      PageCountTotal: totalPages,
+      PageCountSuccess: 0,
+      PageCountError: 0
+    }
+  });
 }
 
 const createSNSMessages = (urls, jobId, lighthouseOpts = {}) => {
@@ -43,7 +44,7 @@ const createSNSMessages = (urls, jobId, lighthouseOpts = {}) => {
   }));
 };
 
-exports.handler = async function(event, context, callback) {
+exports.handler = async function (event, context, callback) {
   const jobId = uuidv1();
   const now = new Date();
 
@@ -67,7 +68,7 @@ exports.handler = async function(event, context, callback) {
   await createJobItemDynamo(jobId, now.toISOString(), urls.length);
   const snsMessages = createSNSMessages(urls, jobId, event.lighthouseOpts);
 
-  await Promise.all(snsMessages.map(msg => sns.publish(msg).promise()));
+  await Promise.all(snsMessages.map(msg => sns.publish(msg)));
 
   return { jobId };
 };

@@ -1,12 +1,24 @@
-const AWS = require("aws-sdk");
+const AWS = require("aws-sdk"),
+      {
+        DynamoDBDocument
+      } = require("@aws-sdk/lib-dynamodb"),
+      {
+        DynamoDB
+      } = require("@aws-sdk/client-dynamodb"),
+      {
+        Upload
+      } = require("@aws-sdk/lib-storage"),
+      {
+        S3
+      } = require("@aws-sdk/client-s3");
 
 const createLighthouse = require("./create-lighthouse.js");
 const fs = require("fs");
 
 AWS.config.update({ region: process.env.REGION });
 
-const ddb = new AWS.DynamoDB.DocumentClient();
-const s3 = new AWS.S3();
+const ddb = DynamoDBDocument.from(new DynamoDB());
+const s3 = new S3();
 
 async function updateJobItemAndCreateRunItem(
   jobId,
@@ -26,7 +38,7 @@ async function updateJobItemAndCreateRunItem(
     }
   };
 
-  await ddb.update(updatedJob).promise();
+  await ddb.update(updatedJob);
 
   const newRun = {
     TableName: process.env.RUNS_TABLE_NAME,
@@ -40,7 +52,7 @@ async function updateJobItemAndCreateRunItem(
     newRun.Item.Error = runError;
   }
 
-  return ddb.put(newRun).promise();
+  return ddb.put(newRun);
 }
 
 const s3Key = (jobId, runId, outputFormat) =>
@@ -56,7 +68,7 @@ async function doesRunItemAlreadyExist(runId, consistentRead = false) {
   };
 
   let exists = false;
-  const result = await ddb.get(params).promise();
+  const result = await ddb.get(params);
   if (result.Item !== undefined && result.Item !== null) {
     exists = true;
   }
@@ -71,22 +83,28 @@ async function uploadReportsToS3(
   htmlReport
 ) {
   return Promise.all([
-    s3
-      .upload({
-        Bucket: process.env.BUCKET,
-        Key: jsonReportS3Key,
-        Body: jsonReport,
-        ContentType: "application/json"
-      })
-      .promise(),
-    s3
-      .upload({
-        Bucket: process.env.BUCKET,
-        Key: htmlReportS3Key,
-        Body: htmlReport,
-        ContentType: "text/html"
-      })
-      .promise()
+    new Upload({
+      client: s3,
+
+      params: {
+          Bucket: process.env.BUCKET,
+          Key: jsonReportS3Key,
+          Body: jsonReport,
+          ContentType: "application/json"
+        }
+    })
+      .done(),
+    new Upload({
+      client: s3,
+
+      params: {
+          Bucket: process.env.BUCKET,
+          Key: htmlReportS3Key,
+          Body: htmlReport,
+          ContentType: "text/html"
+        }
+    })
+      .done()
   ]);
 }
 

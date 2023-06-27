@@ -1,8 +1,8 @@
 # Plug in your unique configuration here 
 locals {
   app_version         = "0.0.94"
-  org                 = "ss"
-  aws_region          = "us-west-2"
+  org                 = "bh-test"
+  aws_region          = "us-east-1"
   aws_creds_file_path = "~/.aws/credentials"
   aws_profile_name    = "lighthouseMetrics"
 
@@ -12,8 +12,7 @@ locals {
 
 provider "aws" {
   region                  = "${local.aws_region}"
-  shared_credentials_file = "${local.aws_creds_file_path}"
-  profile                 = "${local.aws_profile_name}"
+  shared_credentials_files = ["${local.aws_creds_file_path}"]
 }
 
 # Bucket for storing LH reports, and deployed lambda functions.
@@ -108,7 +107,7 @@ resource "aws_s3_bucket_object" "lambda_init" {
 
   key    = "lambdas/v${local.app_version}/init.zip"
   source = "${data.archive_file.lambda_init.output_path}"
-  etag   = "${md5(file("lambdas/dist/init.zip"))}"
+  etag   = "${md5("lambdas/dist/init.zip")}"
 }
 
 resource "aws_s3_bucket_object" "lambda_worker" {
@@ -116,7 +115,7 @@ resource "aws_s3_bucket_object" "lambda_worker" {
 
   key    = "lambdas/v${local.app_version}/worker.zip"
   source = "${data.archive_file.lambda_worker.output_path}"
-  etag   = "${md5(file("lambdas/dist/worker.zip"))}"
+  etag   = "${md5("lambdas/dist/worker.zip")}"
 }
 
 resource "aws_s3_bucket_object" "lambda_post_processor" {
@@ -124,7 +123,7 @@ resource "aws_s3_bucket_object" "lambda_post_processor" {
 
   key    = "lambdas/v${local.app_version}/post-processor.zip"
   source = "${data.archive_file.lambda_post_processor.output_path}"
-  etag   = "${md5(file("lambdas/dist/post-processor.zip"))}"
+  etag   = "${md5("lambdas/dist/post-processor.zip")}"
 }
 
 resource "aws_iam_role" "lambda_init" {
@@ -189,7 +188,7 @@ resource "aws_lambda_function" "init" {
   s3_key        = "${aws_s3_bucket_object.lambda_init.key}"
   role          = "${aws_iam_role.lambda_init.arn}"
   handler       = "index.handler"
-  runtime       = "nodejs8.10"
+  runtime       = "nodejs18.x"
   memory_size   = 2048
   timeout       = 30
 
@@ -286,12 +285,12 @@ resource "aws_lambda_function" "worker" {
   s3_key        = "${aws_s3_bucket_object.lambda_worker.key}"
   role          = "${aws_iam_role.lambda_worker.arn}"
   handler       = "index.handler"
-  runtime       = "nodejs8.10"
+  runtime       = "nodejs18.x"
 
   memory_size = "${local.lambda_worker_memory}"
   timeout     = "${local.lambda_worker_timeout}"
 
-  dead_letter_config = {
+  dead_letter_config {
     target_arn = "${aws_sns_topic.pages_to_test_dlq.arn}"
   }
 
@@ -400,7 +399,7 @@ resource "aws_lambda_function" "post_processor" {
   s3_key        = "${aws_s3_bucket_object.lambda_post_processor.key}"
   role          = "${aws_iam_role.lambda_post_processor.arn}"
   handler       = "index.handler"
-  runtime       = "nodejs8.10"
+  runtime       = "nodejs18.x"
   memory_size   = 128
 
   environment {
